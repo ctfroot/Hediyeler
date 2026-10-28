@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #yazi {
+    position: fixed; left: 0; right: 0; top: 12%; transform: translateY(-100%);
+    text-align: center; pointer-events: none; padding: 0 12px;
+    font-family: 'Great Vibes', 'Brush Script MT', 'Segoe Script', cursive;
+    font-size: clamp(34px, 11vw, 78px); line-height: 1.1;
+    background: linear-gradient(100deg, #ff1e3c 0%, #ff8fa3 30%, #fff 50%, #ff8fa3 70%, #ff1e3c 100%);
+    background-size: 250% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 0 10px rgba(255,0,40,.85)) drop-shadow(0 0 24px rgba(255,0,40,.5));
+    opacity: 0; transform: translateY(-100%) scale(.9);
+    transition: opacity 2.5s ease-in, transform 2.5s ease-out;
+  }
+  #yazi small { display: block; font-size: .45em; letter-spacing: .5em; margin-top: 4px; }
+  #yazi.goster { opacity: 1; transform: translateY(-100%) scale(1); animation: parilti 4s linear 2.5s infinite; }
+  @keyframes parilti { from { background-position: 0% 0; } to { background-position: -250% 0; } }
+  #ipucu {
+    position: fixed; bottom: 16px; left: 0; right: 0; text-align: center;
+    color: #ff2a2a; font: 14px sans-serif; opacity: 0; transition: opacity .4s;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="yazi">Esma canım arkadaşım<small>♥ ♥ ♥</small></div>
+<div id="ipucu">🔊 Müziği başlatmak için ekrana dokun</div>
+
+<!-- ŞARKI: muzik.mp3 dosyasını bu HTML dosyasıyla AYNI klasöre koy -->
+<audio id="muzik" src="muzik.mp3" autoplay loop preload="auto"></audio>
+
+<script>
+// ---- Ayarlar ----
+const SURE = 15;      // saniye (animasyon süresi)
+const RENK = "red";
+const KALINLIK = 4;
+
+// ---- Python kodunun aynısı ----
+function heart(n) {
+  const x = 15 * Math.pow(Math.sin(n), 3);
+  const y = 12 * Math.cos(n) - 5 * Math.cos(2*n) - 2 * Math.cos(3*n) - Math.cos(4*n);
+  return [x, y];
+}
+
+// Tüm noktalar: for i in range(16): for j in range(0,100): goto(x*i, y*i)
+const pts = [[0, 0]]; // turtle (0,0)'dan başlar
+for (let i = 0; i < 16; i++) {
+  for (let j = 0; j < 100; j++) {
+    const [x, y] = heart(j / 15);
+    pts.push([x * i, y * i]);
+  }
+}
+
+// Sınırlar (ekrana sığdırmak için)
+let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+for (const [x, y] of pts) {
+  if (x < minX) minX = x; if (x > maxX) maxX = x;
+  if (y < minY) minY = y; if (y > maxY) maxY = y;
+}
+
+const cv = document.getElementById("c");
+const ctx = cv.getContext("2d");
+let W, H, scale, ox, oy, cizilen = 0; // cizilen: şimdiye kadar çizilen nokta sayısı
+
+function map(p) {
+  return [ox + p[0] * scale, oy - p[1] * scale]; // y ters (turtle'da yukarı +)
+}
+
+function ayarla() {
+  const dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  scale = Math.min(W * 0.8 / (maxX - minX), H * 0.58 / (maxY - minY));
+  ox = W / 2 - ((minX + maxX) / 2) * scale;
+  oy = H * 0.62 + ((minY + maxY) / 2) * scale;
+  document.getElementById("yazi").style.top = (oy - maxY * scale - 12) + "px"; // kalbin tepesi
+  stilAyarla();
+  // yeniden boyutlanınca şimdiye kadar çizileni tekrar çiz
+  const onceki = cizilen; cizilen = 0;
+  parcaCiz(onceki);
+}
+
+function stilAyarla() {
+  ctx.fillStyle = "#000";
+  ctx.strokeStyle = RENK;
+  ctx.lineWidth = KALINLIK;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.shadowColor = "rgba(255,0,0,.7)";
+  ctx.shadowBlur = 8;
+}
+
+function parcaCiz(hedef) {
+  if (cizilen === 0) { ctx.save(); ctx.shadowBlur = 0; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+  hedef = Math.min(hedef, pts.length - 1);
+  if (hedef <= cizilen) return;
+  ctx.beginPath();
+  let [sx, sy] = map(pts[cizilen]);
+  ctx.moveTo(sx, sy);
+  for (let k = cizilen + 1; k <= hedef; k++) {
+    const [px, py] = map(pts[k]);
+    ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  cizilen = hedef;
+}
+
+window.addEventListener("resize", ayarla);
+ayarla();
+
+// ---- Animasyon: SURE saniyede biter ----
+let baslangic = null;
+function kare(t) {
+  if (baslangic === null) baslangic = t;
+  const oran = Math.min((t - baslangic) / (SURE * 1000), 1);
+  parcaCiz(Math.floor(oran * (pts.length - 1)));
+  if (oran < 1) requestAnimationFrame(kare);
+  else document.getElementById("yazi").classList.add("goster"); // kalp bitince yazı belirir
+}
+requestAnimationFrame(kare);
+
+// ---- Müzik: açılır açılmaz çalmayı dene, tarayıcı engellerse ilk dokunuşta başlat ----
+const muzik = document.getElementById("muzik");
+const ipucu = document.getElementById("ipucu");
+function baslat() {
+  muzik.play().then(() => {
+    ipucu.style.opacity = 0;
+    ["click", "touchstart", "keydown", "pointerdown"].forEach(e => window.removeEventListener(e, baslat));
+  }).catch(() => { ipucu.style.opacity = 1; });
+}
+baslat();
+["click", "touchstart", "keydown", "pointerdown"].forEach(e => window.addEventListener(e, baslat));
+</script>
+</body>
+</html>
+
